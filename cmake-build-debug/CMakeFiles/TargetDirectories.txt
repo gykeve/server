@@ -1,0 +1,12 @@
+/Users/julian/Desktop/Project/server/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/CMakeFiles/WebServer.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/base/CMakeFiles/rebuild_cache.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/base/CMakeFiles/edit_cache.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/base/CMakeFiles/libserver_base.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/base/tests/CMakeFiles/rebuild_cache.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/base/tests/CMakeFiles/edit_cache.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/base/tests/CMakeFiles/LoggingTest.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/tests/CMakeFiles/rebuild_cache.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/tests/CMakeFiles/edit_cache.dir
+/Users/julian/Desktop/Project/server/cmake-build-debug/tests/CMakeFiles/HTTPClient.dir

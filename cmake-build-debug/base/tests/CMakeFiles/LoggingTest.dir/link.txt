@@ -1,0 +1,1 @@
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++  -g -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/LoggingTest.dir/LoggingTest.o  -o LoggingTest  -L/Users/julian/Desktop/Project/server/cmake-build-debug/base ../libserver_base.a -lpthread -lrt 
