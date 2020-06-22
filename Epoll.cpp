@@ -22,12 +22,17 @@ const int EPOLLWAIT_TIME = 10000;
 
 typedef shared_ptr<Channel> SP_Channel;
 
+//
 Epoll::Epoll() : epollFd_(epoll_create1(EPOLL_CLOEXEC)), events_(EVENTSNUM) {
   assert(epollFd_ > 0);
 }
 Epoll::~Epoll() {}
 
 // 注册新描述符
+/*wjl
+ * 逻辑是：每次事件均会改变对应的channel，但是httpdata对象（reset意味着删除fd，只有在del的时候）
+ * （添加定时器的逻辑：如果timeout>0。由于eventfd不需要添加定时器timeout=0
+ */
 void Epoll::epoll_add(SP_Channel request, int timeout) {
   int fd = request->getFd();
   if (timeout > 0) {
@@ -99,9 +104,10 @@ std::vector<SP_Channel> Epoll::getEventsRequest(int events_num) {
 
     SP_Channel cur_req = fd2chan_[fd];
 
-    if (cur_req) {
+    if (cur_req) {//wjl：设置revents
       cur_req->setRevents(events_[i].events);
       cur_req->setEvents(0);
+      //wjl：由于httpdata对象会handleConn的时候会处理，这里可以不用加上
       // 加入线程池之前将Timer和request分离
       // cur_req->seperateTimer();
       req_data.push_back(cur_req);

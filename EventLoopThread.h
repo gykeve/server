@@ -18,7 +18,7 @@ class EventLoopThread : noncopyable {
   void threadFunc();
   EventLoop* loop_;
   bool exiting_;
-  Thread thread_;
+  Thread thread_;//wjl：组合Thread对象，调用start方法
   MutexLock mutex_;
   Condition cond_;
 };

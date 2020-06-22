@@ -22,9 +22,10 @@ class MutexLock : noncopyable {
 
   // 友元类不受访问权限影响
  private:
-  friend class Condition;
+  friend class Condition;//wjl：所以Condition类可以访问MutexLock的私有成员mutex
 };
 
+//wjl：guard同样使用的是引用的方式得到mutexlock类
 class MutexLockGuard : noncopyable {
  public:
   explicit MutexLockGuard(MutexLock &_mutex) : mutex(_mutex) { mutex.lock(); }

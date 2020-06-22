@@ -25,9 +25,9 @@ class Channel {
   std::weak_ptr<HttpData> holder_;
 
  private:
-  int parse_URI();
-  int parse_Headers();
-  int analysisRequest();
+//  int parse_URI();
+//  int parse_Headers();
+//  int analysisRequest();
 
   CallBack readHandler_;
   CallBack writeHandler_;
@@ -51,9 +51,9 @@ class Channel {
   void setWriteHandler(CallBack &&writeHandler) {
     writeHandler_ = writeHandler;
   }
-  void setErrorHandler(CallBack &&errorHandler) {
-    errorHandler_ = errorHandler;
-  }
+//  void setErrorHandler(CallBack &&errorHandler) {
+//    errorHandler_ = errorHandler;
+//  }
   void setConnHandler(CallBack &&connHandler) { connHandler_ = connHandler; }
 
   void handleEvents() {
