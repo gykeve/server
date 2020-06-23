@@ -20,12 +20,18 @@ class EventLoop {
   typedef std::function<void()> Functor;
   EventLoop();
   ~EventLoop();
+
   void loop();
   void quit();
+
   void runInLoop(Functor&& cb);
   void queueInLoop(Functor&& cb);
+
+  //wjl: threadId_之前通过thread_local变量CurrentThread::tid()得到
   bool isInLoopThread() const { return threadId_ == CurrentThread::tid(); }
   void assertInLoopThread() { assert(isInLoopThread()); }
+
+  //创建eventloop的时候创建poller，所以对poller的操作需要通过中间的eventloop对象的接口
   void shutdown(shared_ptr<Channel> channel) { shutDownWR(channel->getFd()); }
   void removeFromPoller(shared_ptr<Channel> channel) {
     // shutDownWR(channel->getFd());
@@ -37,6 +43,7 @@ class EventLoop {
   void addToPoller(shared_ptr<Channel> channel, int timeout = 0) {
     poller_->epoll_add(channel, timeout);
   }
+
 
  private:
   // 声明顺序 wakeupFd_ > pwakeupChannel_

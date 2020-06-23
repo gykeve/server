@@ -16,6 +16,7 @@ pthread_once_t MimeType::once_control = PTHREAD_ONCE_INIT;
 std::unordered_map<std::string, std::string> MimeType::mime;
 
 const __uint32_t DEFAULT_EVENT = EPOLLIN | EPOLLET | EPOLLONESHOT;
+//wjl： 默认过期时间是2s，keep_alive是5min
 const int DEFAULT_EXPIRED_TIME = 2000;              // ms
 const int DEFAULT_KEEP_ALIVE_TIME = 5 * 60 * 1000;  // ms
 
@@ -109,6 +110,8 @@ std::string MimeType::getMime(const std::string &suffix) {
     return mime[suffix];
 }
 
+
+//
 HttpData::HttpData(EventLoop *loop, int connfd)
     : loop_(loop),
       channel_(new Channel(loop, connfd)),
@@ -127,42 +130,21 @@ HttpData::HttpData(EventLoop *loop, int connfd)
   channel_->setConnHandler(bind(&HttpData::handleConn, this));
 }
 
-void HttpData::reset() {
-  // inBuffer_.clear();
-  fileName_.clear();
-  path_.clear();
-  nowReadPos_ = 0;
-  state_ = STATE_PARSE_URI;
-  hState_ = H_START;
-  headers_.clear();
-  // keepAlive_ = false;
-  if (timer_.lock()) {
-    shared_ptr<TimerNode> my_timer(timer_.lock());
-    my_timer->clearReq();
-    timer_.reset();
-  }
-}
-
-void HttpData::seperateTimer() {
-  // cout << "seperateTimer" << endl;
-  if (timer_.lock()) {
-    shared_ptr<TimerNode> my_timer(timer_.lock());
-    my_timer->clearReq();
-    timer_.reset();
-  }
-}
-
+//wjl： read回调
 void HttpData::handleRead() {
   __uint32_t &events_ = channel_->getEvents();
   do {
     bool zero = false;
     int read_num = readn(fd_, inBuffer_, zero);
     LOG << "Request: " << inBuffer_;
-    if (connectionState_ == H_DISCONNECTING) {
+    if (connectionState_ == H_DISCONNECTING) {//wjl：处于disconnecting状态表示对方关闭写。这里也应该清空read缓存
       inBuffer_.clear();
       break;
     }
-    // cout << inBuffer_ << endl;
+    // cout << inBuffer_ << endl;//wjl： 调试
+
+      //wjl：先判断read_num，进行错误处理
+      //错误处理。返回error的html
     if (read_num < 0) {
       perror("1");
       error_ = true;
@@ -174,7 +156,7 @@ void HttpData::handleRead() {
     //     error_ = true;
     //     break;
     // }
-    else if (zero) {
+    else if (zero) {//wjl：这里认为对方关闭
       // 有请求出现但是读不到数据，可能是Request
       // Aborted，或者来自网络的数据没有达到等原因
       // 最可能是对端已经关闭了，统一按照对端已经关闭处理
@@ -187,6 +169,7 @@ void HttpData::handleRead() {
       // cout << "readnum == 0" << endl;
     }
 
+    //wjl：正常。根据解析进度来做处理
     if (state_ == STATE_PARSE_URI) {
       URIState flag = this->parseURI();
       if (flag == PARSE_URI_AGAIN)
@@ -218,7 +201,10 @@ void HttpData::handleRead() {
         state_ = STATE_ANALYSIS;
       }
     }
-    if (state_ == STATE_RECV_BODY) {
+
+    //wjl："Content-length"表示报头以外的长度。（短于这个长度协议要求服务器返回400不正确的请求
+      //超过这个长度后的内容将被抛弃。"不会产生新的post???"
+    if (state_ == STATE_RECV_BODY) {//wjl： 对于post请求，需要计算消息body的长度
       int content_length = -1;
       if (headers_.find("Content-length") != headers_.end()) {
         content_length = stoi(headers_["Content-length"]);
@@ -228,9 +214,12 @@ void HttpData::handleRead() {
         handleError(fd_, 400, "Bad Request: Lack of argument (Content-length)");
         break;
       }
+      //长度小于指定的长度（如果一直没有数据到就会超时）
       if (static_cast<int>(inBuffer_.size()) < content_length) break;
       state_ = STATE_ANALYSIS;
     }
+
+    //wjl：解析请求
     if (state_ == STATE_ANALYSIS) {
       AnalysisState flag = this->analysisRequest();
       if (flag == ANALYSIS_SUCCESS) {
@@ -251,8 +240,8 @@ void HttpData::handleRead() {
     }
     // error_ may change
     if (!error_ && state_ == STATE_FINISH) {
-      this->reset();
-      if (inBuffer_.size() > 0) {
+      this->reset();//解析完，分离计时器
+      if (inBuffer_.size() > 0) {//这里解析完了还有connectionState_ != H_DISCONNECTING
         if (connectionState_ != H_DISCONNECTING) handleRead();
       }
 
@@ -280,11 +269,12 @@ void HttpData::handleWrite() {
 }
 
 void HttpData::handleConn() {
-  seperateTimer();
+  seperateTimer();//wjl：分离计时器
+
   __uint32_t &events_ = channel_->getEvents();
   if (!error_ && connectionState_ == H_CONNECTED) {
     if (events_ != 0) {
-      int timeout = DEFAULT_EXPIRED_TIME;
+      int timeout = DEFAULT_EXPIRED_TIME;//wjl: 默认的2s
       if (keepAlive_) timeout = DEFAULT_KEEP_ALIVE_TIME;
       if ((events_ & EPOLLIN) && (events_ & EPOLLOUT)) {
         events_ = __uint32_t(0);
@@ -312,9 +302,36 @@ void HttpData::handleConn() {
              (events_ & EPOLLOUT)) {
     events_ = (EPOLLOUT | EPOLLET);
   } else {
+      //wjl: 这里直接分离channel，会在poller中处理到期任务
     // cout << "close with errors" << endl;
     loop_->runInLoop(bind(&HttpData::handleClose, shared_from_this()));
   }
+}
+
+
+void HttpData::reset() {
+    // inBuffer_.clear();
+    fileName_.clear();
+    path_.clear();
+    nowReadPos_ = 0;
+    state_ = STATE_PARSE_URI;
+    hState_ = H_START;
+    headers_.clear();
+    // keepAlive_ = false;
+    if (timer_.lock()) {
+        shared_ptr<TimerNode> my_timer(timer_.lock());
+        my_timer->clearReq();
+        timer_.reset();
+    }
+}
+
+void HttpData::seperateTimer() {
+    // cout << "seperateTimer" << endl;
+    if (timer_.lock()) {
+        shared_ptr<TimerNode> my_timer(timer_.lock());
+        my_timer->clearReq();
+        timer_.reset();
+    }
 }
 
 URIState HttpData::parseURI() {
@@ -525,6 +542,7 @@ AnalysisState HttpData::analysisRequest() {
     else
       filetype = MimeType::getMime(fileName_.substr(dot_pos));
 
+    //这里如果是get请求，请求hello文件
     // echo test
     if (fileName_ == "hello") {
       outBuffer_ =
@@ -564,6 +582,7 @@ AnalysisState HttpData::analysisRequest() {
       handleError(fd_, 404, "Not Found!");
       return ANALYSIS_ERROR;
     }
+    //mmap返回请求的文件
     void *mmapRet = mmap(NULL, sbuf.st_size, PROT_READ, MAP_PRIVATE, src_fd, 0);
     close(src_fd);
     if (mmapRet == (void *)-1) {

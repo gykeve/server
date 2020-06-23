@@ -87,6 +87,8 @@ void Server::handNewConn() {
        */
     shared_ptr<HttpData> req_info(new HttpData(loop, accept_fd));
     req_info->getChannel()->setHolder(req_info);
+
+    //wjl：由于这个loop所属的线程不是主线程，所以是queueInLoop
     loop->queueInLoop(std::bind(&HttpData::newEvent, req_info));//wjl:给loop事件循环分配任务！！！
   }
   acceptChannel_->setEvents(EPOLLIN | EPOLLET);

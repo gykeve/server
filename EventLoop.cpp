@@ -33,7 +33,7 @@ EventLoop::EventLoop()
     // LOG << "Another EventLoop " << t_loopInThisThread << " exists in this
     // thread " << threadId_;
   } else {
-    t_loopInThisThread = this;
+    t_loopInThisThread = this;//wjl: 属于运行该eventloop对象的线程的局部变量t_loopInThisThread
   }
   // pwakeupChannel_->setEvents(EPOLLIN | EPOLLET | EPOLLONESHOT);
   pwakeupChannel_->setEvents(EPOLLIN | EPOLLET);
@@ -42,27 +42,7 @@ EventLoop::EventLoop()
   poller_->epoll_add(pwakeupChannel_, 0);
 }
 
-void EventLoop::handleConn() {
-  // poller_->epoll_mod(wakeupFd_, pwakeupChannel_, (EPOLLIN | EPOLLET |
-  // EPOLLONESHOT), 0);
-  updatePoller(pwakeupChannel_, 0);
-}
-
-EventLoop::~EventLoop() {
-  // wakeupChannel_->disableAll();
-  // wakeupChannel_->remove();
-  close(wakeupFd_);
-  t_loopInThisThread = NULL;
-}
-
-void EventLoop::wakeup() {
-  uint64_t one = 1;
-  ssize_t n = writen(wakeupFd_, (char*)(&one), sizeof one);
-  if (n != sizeof one) {
-    LOG << "EventLoop::wakeup() writes " << n << " bytes instead of 8";
-  }
-}
-
+//由于
 void EventLoop::handleRead() {
   uint64_t one = 1;
   ssize_t n = readn(wakeupFd_, &one, sizeof one);
@@ -73,6 +53,30 @@ void EventLoop::handleRead() {
   pwakeupChannel_->setEvents(EPOLLIN | EPOLLET);
 }
 
+void EventLoop::handleConn() {
+  // poller_->epoll_mod(wakeupFd_, pwakeupChannel_, (EPOLLIN | EPOLLET |
+  // EPOLLONESHOT), 0);
+  updatePoller(pwakeupChannel_, 0);
+}
+
+
+EventLoop::~EventLoop() {
+  // wakeupChannel_->disableAll();
+  // wakeupChannel_->remove();
+  close(wakeupFd_);
+  t_loopInThisThread = NULL;//thread local变量置为NULL
+}
+
+void EventLoop::wakeup() {
+  uint64_t one = 1;
+  ssize_t n = writen(wakeupFd_, (char*)(&one), sizeof one);
+  if (n != sizeof one) {
+    LOG << "EventLoop::wakeup() writes " << n << " bytes instead of 8";
+  }
+}
+
+
+
 void EventLoop::runInLoop(Functor&& cb) {
   if (isInLoopThread())
     cb();
@@ -80,6 +84,8 @@ void EventLoop::runInLoop(Functor&& cb) {
     queueInLoop(std::move(cb));
 }
 
+//wjl： 这里是主线程给工作线程分配任务，需要加锁（这个eventloop对象在主线程中调用！
+//线程之间的相互作用：一定是通过某个对象中调用改变其状态，然后另一个线程中会使用这个对象
 void EventLoop::queueInLoop(Functor&& cb) {
   {
     MutexLockGuard lock(mutex_);
@@ -89,6 +95,7 @@ void EventLoop::queueInLoop(Functor&& cb) {
   if (!isInLoopThread() || callingPendingFunctors_) wakeup();
 }
 
+//每个eventloop都需要不断loop，通过与其绑定的poller获得触发的事件
 void EventLoop::loop() {
   assert(!looping_);
   assert(isInLoopThread());
@@ -122,6 +129,7 @@ void EventLoop::doPendingFunctors() {
   callingPendingFunctors_ = false;
 }
 
+//改变quit_，（如果不是在所在的线程就唤醒这个eventloop对象）。从而退出loop
 void EventLoop::quit() {
   quit_ = true;
   if (!isInLoopThread()) {

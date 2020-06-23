@@ -69,18 +69,24 @@ class MimeType {
   static pthread_once_t once_control;
 };
 
+
+//
 class HttpData : public std::enable_shared_from_this<HttpData> {
  public:
   HttpData(EventLoop *loop, int connfd);
   ~HttpData() { close(fd_); }
+
   void reset();
+
   void seperateTimer();
   void linkTimer(std::shared_ptr<TimerNode> mtimer) {
     // shared_ptr重载了bool, 但weak_ptr没有
     timer_ = mtimer;
   }
+
   std::shared_ptr<Channel> getChannel() { return channel_; }
   EventLoop *getLoop() { return loop_; }
+
   void handleClose();
   void newEvent();
 
@@ -91,12 +97,16 @@ class HttpData : public std::enable_shared_from_this<HttpData> {
   std::string inBuffer_;
   std::string outBuffer_;
   bool error_;
-  ConnectionState connectionState_;
 
+  //wjl: connectionState_表示连接的状态
+    //
+  ConnectionState connectionState_;
   HttpMethod method_;
   HttpVersion HTTPVersion_;
   std::string fileName_;
   std::string path_;
+
+  //
   int nowReadPos_;
   ProcessState state_;
   ParseState hState_;
@@ -108,6 +118,7 @@ class HttpData : public std::enable_shared_from_this<HttpData> {
   void handleWrite();
   void handleConn();
   void handleError(int fd, int err_num, std::string short_msg);
+
   URIState parseURI();
   HeaderState parseHeaders();
   AnalysisState analysisRequest();

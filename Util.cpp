@@ -162,15 +162,18 @@ int setSocketNonBlocking(int fd) {
   return 0;
 }
 
+//nodelay禁用nagle算法，允许小包发送
 void setSocketNodelay(int fd) {
   int enable = 1;
   setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&enable, sizeof(enable));
 }
 
+//设置函数关闭tcp连接的行为（缺省：如果有数据残留在socket发送缓冲区，则将继续发送数据给对方，等待确认再返回
+//
 void setSocketNoLinger(int fd) {
   struct linger linger_;
-  linger_.l_onoff = 1;
-  linger_.l_linger = 30;
+  linger_.l_onoff = 1;//wjl: 0关闭，l_linger被忽略；非0，l_linger=0则立即关闭连接
+  linger_.l_linger = 30;//l_onoff!=0&&l_linger!=0:将连接的关闭设置一个超时，如果发送缓冲区仍有数据，进程进入睡眠，内核进入定时状态
   setsockopt(fd, SOL_SOCKET, SO_LINGER, (const char *)&linger_,
              sizeof(linger_));
 }
@@ -180,6 +183,8 @@ void shutDownWR(int fd) {
   // printf("shutdown\n");
 }
 
+
+//wjl:由于是本机，只需要port
 int socket_bind_listen(int port) {
   // 检查port值，取正确区间范围
   if (port < 0 || port > 65535) return -1;
@@ -188,6 +193,8 @@ int socket_bind_listen(int port) {
   int listen_fd = 0;
   if ((listen_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) return -1;
 
+  //wjl：例如关闭服务器后又重启服务器，由于是主动关闭进入time_wait阶段。需要花费一些时间才能重新启用
+          //设置套接字可以立即重启
   // 消除bind时"Address already in use"错误
   int optval = 1;
   if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &optval,
@@ -200,7 +207,10 @@ int socket_bind_listen(int port) {
   struct sockaddr_in server_addr;
   bzero((char *)&server_addr, sizeof(server_addr));
   server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  //wjl: INADDR_ANY转换过来即0.0.0.0表示本机。（只要是从指定端口来的数据不管是从从那个网卡都可以接收到）
+          //wjl：127.0.0.1为本机的环回地址，0.0.0.0表示本机任何地址
+                  //localhost域名，可以代表任何ip地址，默认是127.0.0.1在/etc/hosts文件中
+  server_addr.sin_addr.s_addr = htonl(INADDR_ANY);//wjl：设置服务器的ip。使得服务器计算机所有网卡的ip地址都可以作为服务器的ip地址，即监听外部客户端发送到服务器端所有网卡的网络请求
   server_addr.sin_port = htons((unsigned short)port);
   if (bind(listen_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) ==
       -1) {
@@ -208,6 +218,8 @@ int socket_bind_listen(int port) {
     return -1;
   }
 
+  //backlog的队列数确定：没有来得及accept，可以接受多少进来的连接。大多数系统设定为2048。syn队列
+    //注意accept队列默认取/proc/sys/net/core/somaxconn 和listen的syn队列的参数的最小值，默认128
   // 开始监听，最大等待队列长为LISTENQ
   if (listen(listen_fd, 2048) == -1) {
     close(listen_fd);
