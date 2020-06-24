@@ -23,7 +23,7 @@ const int EPOLLWAIT_TIME = 10000;
 typedef shared_ptr<Channel> SP_Channel;
 
 //
-Epoll::Epoll() : epollFd_(epoll_create1(EPOLL_CLOEXEC)), events_(EVENTSNUM) {
+Epoll::Epoll() : epollFd_(epoll_create1(EPOLL_CLOEXEC)), events_(EVENTSNUM) {//预设的监听事件的数量
   assert(epollFd_ > 0);
 }
 Epoll::~Epoll() {}
@@ -31,11 +31,11 @@ Epoll::~Epoll() {}
 // 注册新描述符
 /*wjl
  * 逻辑是：每次事件均会改变对应的channel，但是httpdata对象（reset意味着删除fd，只有在del的时候）
- * （添加定时器的逻辑：如果timeout>0。由于eventfd不需要添加定时器timeout=0
+ * （添加定时器的逻辑：如果timeout>0则是httpdata对象。由于eventfd不需要添加定时器timeout=0
  */
 void Epoll::epoll_add(SP_Channel request, int timeout) {
   int fd = request->getFd();
-  if (timeout > 0) {
+  if (timeout > 0) {//wjl：httpdata对象
     add_timer(request, timeout);
     fd2http_[fd] = request->getHolder();
   }

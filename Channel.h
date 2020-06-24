@@ -56,9 +56,12 @@ class Channel {
 //  }
   void setConnHandler(CallBack &&connHandler) { connHandler_ = connHandler; }
 
+  //wjl:
+    //epollhup：可以确定对方已经关闭了socket
+    //epollerr：当对方关闭读读时候写数据(本端发生的错误）
   void handleEvents() {
     events_ = 0;
-    if ((revents_ & EPOLLHUP) && !(revents_ & EPOLLIN)) {
+    if ((revents_ & EPOLLHUP) && !(revents_ & EPOLLIN)) {//wjl:
       events_ = 0;
       return;
     }
@@ -77,7 +80,7 @@ class Channel {
   }
   void handleRead();
   void handleWrite();
-  void handleError(int fd, int err_num, std::string short_msg);
+//  void handleError(int fd, int err_num, std::string short_msg);
   void handleConn();
 
   void setRevents(__uint32_t ev) { revents_ = ev; }
